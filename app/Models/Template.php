@@ -4,32 +4,37 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\TemplateField; // <-- 1. Import model TemplateField
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany; // <-- Pastikan ini ada
 
 class Template extends Model
 {
     use HasFactory;
 
-    protected $guarded = [];
+    /**
+     * Kolom yang boleh diisi secara massal (mass assignable).
+     * Lebih aman daripada $guarded = [].
+     */
+    protected $fillable = [
+        'admin_id',
+        'name',
+        'header_html',
+        'footer_html',
+    ];
 
     /**
-     * Mendefinisikan relasi one-to-many ke TemplateField.
-     * Satu Template bisa memiliki banyak Custom Fields.
-     * Langsung diurutkan berdasarkan sort_order.
+     * Relasi ke Admin (Template ini dibuat oleh siapa).
      */
-    public function customFields() // <-- 2. Tambahkan method relasi ini
+    public function admin(): BelongsTo
     {
-        // Relasi hasMany ke model TemplateField
-        // Secara otomatis Laravel akan mencari foreign key 'template_id'
-        return $this->hasMany(TemplateField::class)->orderBy('sort_order'); 
+        return $this->belongsTo(Admin::class);
     }
 
     /**
-     * (Opsional tapi bagus) Mendefinisikan relasi belongsTo ke model Admin.
-     * Satu Template dimiliki oleh satu Admin.
+     * Relasi BARU: Template ini digunakan oleh banyak Dokumen.
      */
-    public function admin() // <-- Tambahkan juga relasi ke Admin jika perlu
+    public function documents(): HasMany
     {
-        return $this->belongsTo(Admin::class);
+        return $this->hasMany(Document::class);
     }
 }

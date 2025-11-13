@@ -1,130 +1,122 @@
 <?php
 
+namespace App\Http\Controllers;
 
-namespace App\Http\Controllers; 
-
-use App\Models\Template; 
-use App\Models\TemplateField; 
-use App\Models\DocumentHistory;
-use Illuminate\Http\Request; 
-use Illuminate\Support\Facades\Auth; 
+use App\Models\Template;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Storage;
+use Inertia\Response;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage; // <-- Pastikan ini ada
 
 class TemplateController extends Controller
 {
-
     /**
      * Menampilkan halaman daftar template.
+     * (Menu: Templates)
      */
-    public function index()
+    public function index(): Response
     {
-        $templates = Template::latest()->get();
-        
         return Inertia::render('Templates/Index', [
-            'templates' => $templates
+            'templates' => Template::latest()->get()->map(fn ($template) => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'created_at' => $template->created_at->format('d M Y'),
+            ]),
+            'flash' => [ // Menambahkan 'flash' untuk notifikasi
+                'success' => session('success'),
+            ],
         ]);
     }
 
     /**
      * Menampilkan halaman untuk membuat template baru.
      */
-    public function create()
+    public function create(): Response
     {
         return Inertia::render('Templates/Create');
     }
 
     /**
      * Menyimpan template baru ke database.
-     * Method ini akan dipanggil oleh route POST /templates
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        // 1. Validasi data utama template
-        $validatedData = $request->validate([
-            'name' => 'required|string|max:255|unique:templates', 
-            'description' => 'nullable|string',
-            'body_html' => 'required|string',
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:templates',
             'header_html' => 'nullable|string',
             'footer_html' => 'nullable|string',
-            
-            'custom_fields' => 'nullable|array',
-            'custom_fields.*.field_name' => 'required_with:custom_fields|string|max:100',
-            'custom_fields.*.field_label' => 'required_with:custom_fields|string|max:150',
-            'custom_fields.*.field_type' => 'required_with:custom_fields|string|in:text,textarea,date,number',
         ]);
 
-        $template = Template::create([
-            'name' => $validatedData['name'],
-            'description' => $validatedData['description'] ?? null,
-            'body_html' => $validatedData['body_html'],
-            'header_html' => $validatedData['header_html'] ?? null,
-            'footer_html' => $validatedData['footer_html'] ?? null,
-            'admin_id' => Auth::id(), 
-        ]);
+        // Menggunakan relasi untuk otomatis mengisi admin_id
+        $request->user()->templates()->create($validated);
 
-        if (isset($validatedData['custom_fields']) && is_array($validatedData['custom_fields'])) {
-            $sortOrder = 0;
-            $fieldsToInsert = [];
-            foreach ($validatedData['custom_fields'] as $fieldData) {
-                if (isset($fieldData['field_name'], $fieldData['field_label'], $fieldData['field_type'])) {
-                    $fieldsToInsert[] = [
-                        'template_id' => $template->id, 
-                        'field_name' => $fieldData['field_name'],
-                        'field_label' => $fieldData['field_label'],
-                        'field_type' => $fieldData['field_type'],
-                        'is_required' => $fieldData['is_required'] ?? true, 
-                        'sort_order' => $sortOrder++,
-                    ];
-                }
-            }
-            if (!empty($fieldsToInsert)) {
-                TemplateField::insert($fieldsToInsert);
-            }
-        }
-
-        return redirect()->route('templates.index')->with('success', 'Template berhasil disimpan!');
+        return redirect()->route('templates.index')->with('success', 'Template berhasil dibuat.');
     }
 
-    public function previewPdf(Request $request)
+    /**
+     * Menampilkan halaman untuk mengedit template.
+     */
+    public function edit(Template $template): Response
     {
-        $request->validate([
-            'body_html' => 'required|string',
+        return Inertia::render('Templates/Edit', [
+            'template' => $template
         ]);
-
-        $htmlContent = $request->input('body_html');
-
-        try {
-            $pdf = Pdf::loadHTML($htmlContent);
-            return $pdf->download('template-preview.pdf');
-        } catch (\Exception $e) {
-            // Jika HTML-nya error (misal tag tidak ditutup), dompdf akan gagal
-            return response()->json(['error' => 'Gagal membuat PDF: ' . $e->getMessage()], 500);
-        }
     }
 
-    public function destroy(Template $template)
+    /**
+     * Memperbarui template yang ada di database.
+     */
+    public function update(Request $request, Template $template): RedirectResponse
     {
-        
+        $validated = $request->validate([
+            'name' => [
+                'required', 'string', 'max:255',
+                Rule::unique('templates')->ignore($template->id),
+            ],
+            'header_html' => 'nullable|string',
+            'footer_html' => 'nullable|string',
+        ]);
+
+        $template->update($validated);
+
+        return redirect()->route('templates.index')->with('success', 'Template berhasil diperbarui.');
+    }
+
+    public function destroy(Template $template): RedirectResponse
+    {
+        // PERBAIKAN: Cek relasi sebelum menghapus
+        // Kita hitung berapa dokumen yang menggunakan template_id ini
+        $documentCount = $template->documents()->count();
+
+        if ($documentCount > 0) {
+            // Jika ada dokumen (hitungan > 0), JANGAN HAPUS
+            // Kirim pesan error kembali ke halaman Index
+            return redirect()->route('templates.index')->with('error', 'Gagal! Template ini sedang digunakan oleh ' . $documentCount . ' dokumen.');
+        }
+
+        // Jika hitungan = 0, aman untuk dihapus
         $template->delete();
-        
-        return redirect()->route('templates.index')->with('success', 'Template berhasil dihapus!');
+
+        return redirect()->route('templates.index')->with('success', 'Template berhasil dihapus.');
     }
 
+    /**
+     * Fungsi untuk menangani upload gambar dari TinyMCE.
+     */
     public function uploadImage(Request $request)
     {
-    
         $request->validate([
             'file' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
 
         $path = $request->file('file')->store('uploads/templates', 'public');
-
         $url = Storage::url($path);
 
         return response()->json([
             'location' => $url
         ]);
     }
-}
+} // <-- INI ADALAH '}' YANG HILANG

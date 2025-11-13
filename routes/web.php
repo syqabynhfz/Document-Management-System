@@ -1,98 +1,103 @@
 <?php
 
-use App\Http\Controllers\AiTemplateGeneratorController;
-use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
+
+// 1. IMPORT CONTROLLER YANG AKAN KITA GUNAKAN
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TemplateController;
+use App\Http\Controllers\VendorController;
+use App\Http\Controllers\DocTypeController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\HistoryController;
-use App\Http\Controllers\GeneratorController;
-use App\Models\DocumentHistory;
+
+// 2. IMPORT MODEL UNTUK DATA DASHBOARD
+use App\Models\Document;
 use App\Models\Template;
+use App\Models\Vendor;
+use App\Models\DocType;
+use Illuminate\Support\Facades\Auth; // <-- Import Auth
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| Web Routes (ARSITEKTUR BARU)
 |--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
-|
 */
 
+// Rute root, alihkan ke login atau dashboard
 Route::get('/', function () {
+    if (auth()->check()) {
+        return Redirect::route('dashboard');
+    }
     return Redirect::route('login');
 });
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard', [
-        'userName'        => Auth::user()->full_name, 
-        'totalDocuments'  => DocumentHistory::count(), 
-        'totalTemplates'  => Template::count(),
-        'recentDocuments' => DocumentHistory::latest()->take(5)->get(), 
-    ]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+// Grup Rute yang memerlukan Login (Middleware Auth)
+Route::middleware(['auth', 'verified'])->group(function () {
+    
+    // ===================================================================
+    // MENU: DASHBOARD
+    // ===================================================================
+    Route::get('/dashboard', function () {
+        // Logika baru untuk Dashboard
+        // Menghitung jumlah dokumen untuk setiap tipe dokumen
+        $masterDocCounts = DocType::withCount('documents')->get(); 
+        // Menghitung jumlah dokumen untuk setiap vendor
+        $masterToCounts = Vendor::withCount('documents')->get();
 
-Route::middleware('auth')->group(function () {
+        return Inertia::render('Dashboard', [
+            'totalDocuments' => Document::count(),
+            'totalTemplates' => Template::count(),
+            'masterDocData' => $masterDocCounts, // Data untuk grafik Master Doc
+            'masterToData' => $masterToCounts,   // Data untuk grafik Master To
+        ]);
+    })->name('dashboard');
+
+    // ===================================================================
+    // MENU: DATA (VENDORS / MASTER TO)
+    // ===================================================================
+    // Route::resource() otomatis membuat route untuk:
+    // index, create, store, edit, update, destroy
+    Route::resource('/data', VendorController::class)->names('data');
+
+    // ===================================================================
+    // MENU: TEMPLATES (HEADER/FOOTER)
+    // ===================================================================
+    Route::resource('/templates', TemplateController::class)->names('templates');
+    Route::post('/templates/upload-image', [TemplateController::class, 'uploadImage'])
+        ->name('templates.upload_image');
+
+    // ===================================================================
+    // MENU: MASTER DOC (DOC TYPES)
+    // ===================================================================
+    Route::resource('/master-doc', DocTypeController::class)->names('master-doc');
+
+    // ===================================================================
+    // MENU: DOCUMENT (PEMBUATAN MANUAL)
+    // ===================================================================
+    Route::resource('/document', DocumentController::class)->names('document');
+
+    Route::get('/document/{document}/download', [DocumentController::class, 'download'])
+        ->name('document.download');
+
+    // ===================================================================
+    // MENU: HISTORY (REVISIONS)
+    // ===================================================================
+    // Menampilkan daftar dokumen yang punya revisi
+    Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
+    // Menampilkan detail revisi untuk satu dokumen
+    Route::get('/history/{document}', [HistoryController::class, 'show'])->name('history.show');
+
+
+    // ===================================================================
+    // Rute Profil Bawaan
+    // ===================================================================
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
 });
 
-Route::get('/templates', [TemplateController::class, 'index']) 
-    ->middleware(['auth'])
-    ->name('templates.index');
-
-Route::get('/templates/create', [TemplateController::class, 'create'])->name('templates.create');
-
-Route::get('/history', [HistoryController::class, 'index'])
-    ->middleware(['auth'])
-    ->name('history.index');
-
-Route::get('/history/{history}/download', [HistoryController::class, 'download'])
-    ->middleware(['auth'])
-    ->name('history.download');
-
-Route::delete('/history/{history}', [HistoryController::class, 'destroy'])
-    ->middleware(['auth'])
-    ->name('history.destroy');
-
-Route::get('/generator', function () {
-    return Inertia::render('FormulirGenerator');
-})->middleware(['auth'])->name('generator.index');
-
-Route::get('/generator/{template}', [GeneratorController::class, 'show'])
-    ->middleware(['auth'])
-    ->name('generator.show');
-    
-Route::get('/generator/{template}/generate', [GeneratorController::class, 'generate']) 
-    ->middleware(['auth'])
-    ->name('generator.generate');
-
-Route::get('/ai-importer', function () {
-    return Inertia::render('AI/Importer'); 
-})->middleware(['auth'])->name('ai.importer.show');
-
-Route::post('/ai-generate-template', [AiTemplateGeneratorController::class, 'process'])
-    ->middleware(['auth'])
-    ->name('ai.generate.template');
-
-Route::post('/templates', [TemplateController::class, 'store'])
-    ->name('templates.store');
-
-Route::post('/templates/preview-pdf', [TemplateController::class, 'previewPdf'])
-    ->middleware(['auth'])
-    ->name('templates.preview');
-    
-Route::delete('/templates/{template}', [TemplateController::class, 'destroy'])
-    ->middleware(['auth'])
-    ->name('templates.destroy');
-
-Route::post('/templates/upload-image', [TemplateController::class, 'uploadImage'])
-    ->middleware(['auth'])
-    ->name('templates.upload_image');
-
+// Load file auth.php (untuk login, register, dll)
 require __DIR__.'/auth.php';

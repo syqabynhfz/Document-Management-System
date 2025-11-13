@@ -1,184 +1,82 @@
 <script setup>
-import { ref } from "vue";
 import { Head, Link, useForm } from "@inertiajs/vue3";
+import InputLabel from "@/Components/InputLabel.vue";
+import TextInput from "@/Components/TextInput.vue";
+import InputError from "@/Components/InputError.vue";
+import PrimaryButton from "@/Components/PrimaryButton.vue";
 import Editor from "@tinymce/tinymce-vue";
-import draggable from "vuedraggable";
 import axios from "axios";
 
-const form = useForm({
-    name: "Template Baru (Klik untuk Mengedit)",
-    body_html: "",
-    custom_fields: [],
-});
-
-const tinyMceApiKey = "cv91g7yskmqat5acgisde00o4hsp8lf4r50348gl34v6jfa3";
-
-const contentBlocks = ref([
-    {
-        id: "text",
-        name: "Text",
-        svgPath: "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12", // Path SVG untuk Teks (Heroicons)
-        defaultHtml: "<h2>Judul Baru</h2><p>Tulis paragraf Anda di sini...</p>",
-    },
-    {
-        id: "image",
-        name: "Image",
-        svgPath:
-            "M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm1.5-3.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0z",
-        defaultHtml:
-            '<p><img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDQwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2YxZjVmOSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjYwMCIgZm9udC1zaXplPSIxNiIgc3Ryb2tlPSIjZDFkNWQ5IiBmaWxsPSIjNmI3MjgwIj5Eb3VibGUtY2xpY2sgb3IgZHJhZyBpbWFnZSBoZXJlPC90ZXh0Pjwvc3ZnPg==" alt="Image Placeholder" width="400" height="200" /></p>',
-    },
-    {
-        id: "table",
-        name: "Table",
-        svgPath:
-            "M3.375 18h17.25c.621 0 1.125-.504 1.125-1.125V8.25c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v8.625c0 .621.504 1.125 1.125 1.125zM3.375 7.125h17.25c.621 0 1.125-.504 1.125-1.125V3.375c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v2.625c0 .621.504 1.125 1.125 1.125z", // Path SVG untuk Tabel
-        defaultHtml:
-            '<table border="1" style="width: 100%; border-collapse: collapse;"><tbody><tr><td style="padding: 5px;">Kolom 1</td><td style="padding: 5px;">Kolom 2</td></tr><tr><td style="padding: 5px;">Data A</td><td style="padding: 5px;">Data B</td></tr></tbody></table>',
-    },
-    {
-        id: "pagebreak",
-        name: "Page Break",
-        svgPath:
-            "M19.5 21a3 3 0 003-3V6a3 3 0 00-3-3H4.5A2.25 2.25 0 002.25 5.25v13.5A2.25 2.25 0 004.5 21h15zm-6.75-2.25a.75.75 0 00-1.5 0v.001a.75.75 0 001.5 0v-.001zm0-3a.75.75 0 00-1.5 0v.001a.75.75 0 001.5 0v-.001z",
-        defaultHtml: '<p style="page-break-before: always;"></p>',
-    },
-]);
-
-const handleDragStart = (event, block) => {
-    event.dataTransfer.setData("text/html", block.defaultHtml);
-    event.dataTransfer.effectAllowed = "copy";
-};
-
-const tinyMceConfig = {
-    height: 650,
-
-    menubar: true,
-
-    plugins: [
-        "advlist",
-        "autolink",
-        "lists",
-        "link",
-        "image",
-        "charmap",
-        "preview",
-
-        "anchor",
-        "searchreplace",
-        "visualblocks",
-        "code",
-        "fullscreen",
-
-        "insertdatetime",
-        "media",
-        "table",
-        "help",
-        "wordcount",
-
-        "pagebreak",
-    ],
-
+// Konfigurasi TinyMCE
+const tinyMceApiKey = "gkuqcbrv8r2wl46hyw02bydp4wt97r6qcsw3iex6ir3cdao2"; // Key Anda
+const tinyMceConfig = (height = 300) => ({
+    height: height,
+    menubar: false,
+    plugins: ["lists", "link", "image", "code", "table", "wordcount", "media"],
     toolbar:
-        "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table pagebreak | align lineheight | numlist bullist indent outdent | emoticons charmap | removeformat | help",
-
+        "undo redo | blocks | bold italic | alignleft aligncenter alignright | bullist numlist | link image media | code",
     automatic_uploads: true,
-    images_file_types: 'jpeg,jpg,png,gif,webp,svg,avif',
-
     images_upload_handler: (blobInfo, success, failure) => {
         const formData = new FormData();
         formData.append("file", blobInfo.blob(), blobInfo.filename());
 
-        axios
+        // TAMBAHKAN 'return' di sini
+        return axios
             .post(route("templates.upload_image"), formData)
             .then((res) => {
                 success(res.data.location);
+                return res.data.location; // Kembalikan juga di sini
             })
             .catch((err) => {
-                let errorMessage = "Upload gagal: ";
-                if (
-                    err.response &&
-                    err.response.data &&
-                    err.response.data.message
-                ) {
-                    errorMessage += err.response.data.message;
-                } else {
-                    errorMessage += err.message;
-                }
-
-                failure({ message: errorMessage, remove: true });
+                failure("Upload gagal: " + err.message);
+                return Promise.reject("Upload gagal: " + err.message); // Kembalikan reject
             });
     },
+});
 
-    setup: (editor) => {
-        editor.on("drop", (event) => {
-            event.preventDefault();
+// Inisialisasi form
+const form = useForm({
+    name: "Template Baru",
+    header_html: "",
+    footer_html: "",
+});
 
-            const htmlContent = event.dataTransfer.getData("text/html");
-
-            if (htmlContent) {
-                editor.execCommand("mceInsertContent", false, htmlContent);
-            }
-        });
-
-        editor.on("dragover", (event) => {
-            event.preventDefault();
-        });
-    },
-};
-
-const saveTemplate = () => {
+// Fungsi submit
+const submit = () => {
     form.post(route("templates.store"), {
-        preserveScroll: true,
         onError: (errors) => {
-            if (errors.name) {
-                alert("Gagal Menyimpan: " + errors.name);
-            } else {
-                alert("Terjadi error. Periksa konsol.");
-            }
-            console.error("Error:", errors);
+            console.error("Error saat menyimpan:", errors);
+            alert("Gagal menyimpan. Cek konsol.");
         },
-        onSuccess: () => {},
     });
-};
-
-const isDownloading = ref(false);
-
-const downloadPreview = () => {
-    isDownloading.value = true;
-    axios
-        .post(
-            route("templates.preview"),
-            {
-                body_html: form.body_html,
-            },
-            {
-                responseType: "blob",
-            }
-        )
-        .then((response) => {
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement("a");
-            link.href = url;
-            link.setAttribute("download", "template-preview.pdf");
-            document.body.appendChild(link);
-            link.click();
-
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(link);
-        })
-        .catch((error) => {
-            console.error("Gagal download PDF:", error);
-            alert("Gagal membuat preview PDF. Periksa konsol.");
-        })
-        .finally(() => {
-            isDownloading.value = false;
-        });
 };
 </script>
 
+<style>
+.page-container {
+    width: 100%;
+    padding: 2rem;
+    background-color: #f3f4f6; /* Latar belakang abu-abu */
+}
+.page-a4 {
+    width: 21cm; /* Lebar A4 */
+    min-height: 29.7cm; /* Tinggi A4 */
+    padding: 2cm; /* Margin standar dokumen */
+    margin: 0 auto; /* Centering */
+    background: white;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.page-a4 .prose {
+    max-width: 100%;
+}
+</style>
+
 <template>
-    <Head title="Add Template" />
+    <Head title="Buat Template Baru" />
 
     <div class="flex flex-col h-screen bg-gray-100 font-sans">
         <header
@@ -187,134 +85,130 @@ const downloadPreview = () => {
             <div class="flex items-center space-x-4">
                 <Link
                     :href="route('templates.index')"
-                    title="Back to Templates"
+                    class="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
                 >
-                    <img
-                        src="/images/logorimba.png"
-                        alt="Logo Rimba"
-                        class="w-12 h-8"
-                    />
+                    <svg
+                        class="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M15.75 19.5 8.25 12l7.5-7.5"
+                        />
+                    </svg>
+                    <span class="text-sm font-medium"
+                        >Kembali ke Templates</span
+                    >
                 </Link>
-                <input
-                    type="text"
-                    v-model="form.name"
-                    placeholder="Beri nama template Anda"
-                    class="text-xl font-semibold text-gray-800 border-b-2 border-transparent focus:border-teal-500 outline-none"
-                />
             </div>
-            <div class="flex items-center space-x-2">
-                <button
-                    @click="saveTemplate"
-                    :disabled="form.processing"
-                    class="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-teal-700 inline-flex items-center"
-                >
-                    <svg
-                        class="w-5 h-5 mr-2"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                    >
-                        <path
-                            fill-rule="evenodd"
-                            d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.052-.143z"
-                            clip-rule="evenodd"
-                        />
-                    </svg>
-                    {{ form.processing ? "Menyimpan..." : "Save Template" }}
-                </button>
-                <button
-                    @click="downloadPreview"
-                    :disabled="isDownloading"
-                    class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-red-600 inline-flex items-center"
-                >
-                    <svg
-                        class="w-5 h-5 mr-2"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                    >
-                        <path
-                            d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.28 8.28a.75.75 0 10-1.06 1.06l4.25 4.25a.75.75 0 001.06 0l4.25-4.25a.75.75 0 10-1.06-1.06l-2.97 2.97V2.75z"
-                        />
-                        <path
-                            d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"
-                        />
-                    </svg>
-                    {{ isDownloading ? "Loading..." : "Download" }}
-                </button>
-                <button
-                    class="p-2 text-gray-500 hover:bg-gray-100 rounded-full"
-                >
-                    <svg
-                        class="w-6 h-6"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                    >
-                        <path
-                            d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM11.5 15.5a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0z"
-                        />
-                    </svg>
-                </button>
+
+            <div class="flex items-center space-x-4">
+                <TextInput
+                    id="name"
+                    type="text"
+                    class="text-lg font-semibold text-gray-800"
+                    v-model="form.name"
+                    required
+                    autofocus
+                    placeholder="Beri nama template..."
+                />
+                <InputError class="mt-2" :message="form.errors.name" />
+
+                <PrimaryButton @click="submit" :disabled="form.processing">
+                    {{ form.processing ? "Menyimpan..." : "Simpan Template" }}
+                </PrimaryButton>
             </div>
         </header>
 
-        <div class="flex-1 flex overflow-hidden min-h-0">
-            <div class="flex-1 flex flex-col p-6 overflow-y-auto">
-                <div
-                    class="bg-white rounded-lg shadow-lg p-2 flex-1 flex flex-col"
-                >
-                    <Editor
-                        :api-key="tinyMceApiKey"
-                        v-model="form.body_html"
-                        :init="tinyMceConfig"
-                        class="flex-1 w-full h-full"
-                    />
+        <div
+            class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-0 overflow-hidden"
+        >
+            <div class="page-container overflow-y-auto lg:col-span-3">
+                <div class="page-a4">
+                    <header>
+                        <div
+                            v-if="!form.header_html"
+                            class="text-center text-gray-400 italic py-10 border-b border-dashed"
+                        >
+                            Header Preview
+                        </div>
+                        <div
+                            v-else
+                            v-html="form.header_html"
+                            class="prose max-w-none"
+                        ></div>
+                    </header>
+
+                    <div class="flex-1 text-gray-400 italic my-10">
+                        <p>
+                            (Konten dokumen Anda akan muncul di sini saat Anda
+                            menggunakan template ini di menu "Document").
+                        </p>
+                    </div>
+
+                    <footer>
+                        <div
+                            v-if="!form.footer_html"
+                            class="text-center text-gray-400 italic py-10 border-t border-dashed"
+                        >
+                            Footer Preview
+                        </div>
+                        <div
+                            v-else
+                            v-html="form.footer_html"
+                            class="prose max-w-none"
+                        ></div>
+                    </footer>
                 </div>
             </div>
 
-            <aside
-                class="w-80 bg-white p-6 border-l border-gray-200 overflow-y-auto"
-            >
-                <h3 class="font-bold text-lg mb-4">Content</h3>
-                <draggable
-                    :list="contentBlocks"
-                    item-key="id"
-                    :group="{
-                        name: 'contentBlocks',
-                        pull: 'clone',
-                        put: false,
-                    }"
-                    :sort="false"
-                    class="grid grid-cols-2 gap-4"
-                >
-                    <template #item="{ element }">
-                        <div
-                            class="bg-gray-100 border border-gray-300 p-4 rounded-lg flex flex-col items-center justify-center cursor-grab hover:bg-gray-200 transition-colors h-24"
-                            draggable="true"
-                            @dragstart="handleDragStart($event, element)"
-                        >
-                            <svg
-                                class="w-8 h-8 text-gray-600"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke-width="1.5"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    :d="element.svgPath"
-                                />
-                            </svg>
-                            <p class="font-semibold text-xs mt-2 text-gray-700">
-                                {{ element.name }}
-                            </p>
-                        </div>
-                    </template>
-                </draggable>
-            </aside>
+            <div class="bg-white overflow-y-auto shadow-sm lg:col-span-1">
+                <div class="p-6 space-y-6">
+                    <div>
+                        <InputLabel
+                            for="header_html"
+                            value="Header HTML (Kop Surat)"
+                        />
+                        <p class="text-sm text-gray-500 mb-2">
+                            Anda bisa upload gambar atau menempelkan URL gambar
+                            langsung di editor.
+                        </p>
+                        <Editor
+                            :api-key="tinyMceApiKey"
+                            v-model="form.header_html"
+                            :init="tinyMceConfig(300)"
+                        />
+                        <InputError
+                            class="mt-2"
+                            :message="form.errors.header_html"
+                        />
+                    </div>
+
+                    <div>
+                        <InputLabel
+                            for="footer_html"
+                            value="Footer HTML (Kaki Surat)"
+                        />
+                        <p class="text-sm text-gray-500 mb-2">
+                            Anda bisa upload gambar atau menempelkan URL gambar
+                            langsung di editor.
+                        </p>
+                        <Editor
+                            :api-key="tinyMceApiKey"
+                            v-model="form.footer_html"
+                            :init="tinyMceConfig(200)"
+                        />
+                        <InputError
+                            class="mt-2"
+                            :message="form.errors.footer_html"
+                        />
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>
